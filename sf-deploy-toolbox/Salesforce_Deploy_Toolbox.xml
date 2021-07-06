@@ -1,0 +1,1622 @@
+<!-- ================================================================================ -->
+<!--                                                                                  -->
+<!-- SALESFORCE DEPLOY TOOLBOX                                                        -->
+<!--                                                                                  -->
+<!-- Initial author: Vincent FINET                                                    -->
+<!-- Contributors: Erwan YHUELLOU                                                     -->
+<!--                                                                                  -->
+<!-- Version: 1.1                                                                     -->
+<!--   - Change due to API 33.0 and the ability to run all tests                      -->
+<!--   - Changes in targets (for running all tests) and removing prepareTest          -->
+<!--                                                                                  -->
+<!-- Version: 1.0                                                                     -->
+<!--   - Initial version sent to Salesforce TA colleagues                             -->
+<!--                                                                                  -->
+<!-- ================================================================================ -->
+<project name="Salesforce Deploy Toolbox Script" basedir=".">
+
+	<!-- ================================================================================ -->
+	<!--                                                                                  -->
+	<!-- Initialisation                                                                   -->
+	<!--                                                                                  -->
+	<!-- ================================================================================ -->
+
+	<!--  Download from Salesforce Tools page under Setup -->
+	<taskdef resource="com/salesforce/antlib.xml" classpath="../ant-add-libs/ant-salesforce.jar" />
+
+	<!--  Download from http://sourceforge.net/projects/ant-contrib/files/ant-contrib/1.0b3/ -->
+	<taskdef resource="net/sf/antcontrib/antlib.xml" classpath="../ant-add-libs/ant-contrib.jar" />
+
+	<!-- Include all properties -->
+	<property file = "../build.properties"/>
+
+	<!-- ================================================================================ -->
+	<!--                                                                                  -->
+	<!-- Targets                                                                          -->
+	<!--                                                                                  -->
+	<!-- ================================================================================ -->
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- List all targets and usage of this build.xml                                     -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> help                               -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="help">
+		<echo />
+                      
+		<echo>HELP:</echo>
+		<echo>    List all targets and usage of this build.xml</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; help </echo>
+		<echo />
+                      
+		<echo>TEST:</echo>
+		<echo>    Make sure this ant script is ok XML speaking</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; test</echo>
+		<echo />
+
+		<echo>GENERATE PACKAGE XML:</echo>
+		<echo>    Generate the package xml file with all components possible in an org</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DPackageXmlFilename=&lt;file&gt; -DApiVersion=&lt;version&gt; [-DStandardObjectsAndFields=&lt;file&gt;] [-DListDetails=&lt;true|false&gt;] generatePackageXml</echo>
+		<echo />
+
+		<echo>SPLIT PACKAGE XML:</echo>
+		<echo>    Split a package xml file into two package xml files by filtering the metadata types</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DPackageXmlFilename=&lt;file&gt; -DPackageXmlFilename1=&lt;file1&gt; -DPackageXmlFilename2=&lt;file2&gt; -DMetadataFilterForFile1=&lt;Type[,Type]&gt; -DApiVersion=&lt;version&gt; splitPackageXml</echo>
+		<echo />
+
+		<echo>RETRIEVE (without git):</echo>
+		<echo>    Retrieves the metadata in a local directory (without git installed)</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DPackageXmlFilename=&lt;file&gt; -DDirectory=&lt;dir&gt; retrieve</echo>
+		<echo />
+
+		<echo>DEPLOY:</echo>
+		<echo>    Deploy the metadata in a local directory (without git installed) to an org</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DDirectory=&lt;dir&gt; -DCheckOnly=&lt;true|false&gt; -DRunAll=&lt;true|false&gt; deploy</echo>
+		<echo />
+
+		<echo>RUN ALL UNIT TESTS:</echo>
+		<echo>    Run all unit tests of a given org. Arg 'ApiVersion' should be at least 33.0.</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DApiVersion=&lt;version&gt; runAllUnitTests</echo>
+		<echo />
+
+		<echo>RUN LOCAL UNIT TESTS:</echo>
+		<echo>    Run only local unit tests of a given org. Arg 'ApiVersion' should be at least 33.0.</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DApiVersion=&lt;version&gt; runLocalUnitTests</echo>
+		<echo />
+
+		<echo>BACKUP (with git):</echo>
+		<echo>    Backup all metadata from an org in a local repository under git</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DGitLocalRepDir=&lt;dir&gt; -DApiVersion=&lt;version&gt; [-DMetadataFilterForFile1=metadataType1[,metadataType2]] [-DPackageXmlStandardObjAndFld=&lt;file&gt;] [-DStandardObjectsAndFields=&lt;file&gt;] [-DListDetails=&lt;true|false&gt;] backup</echo>
+		<echo />
+
+		<echo>BACKUP (without git):</echo>
+		<echo>    Backup all metadata from an org in a local directory (without git installed)</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DOrganization=&lt;org&gt; -DDirectory=&lt;dir&gt; -DApiVersion=&lt;version&gt; [-DMetadataFilterForFile1=metadataType1[,metadataType2]] [-DPackageXmlStandardObjAndFld=&lt;file&gt;] [-DStandardObjectsAndFields=&lt;file&gt;] [-DListDetails=&lt;true|false&gt;] backup2</echo>
+		<echo />
+
+		<echo>REMOVE SYSTEM PERMISSION (without git):</echo>
+		<echo>    Because some new system permission will prevent you from deploying into an older release, this target will comment those system permissions in Profiles and Perm Sets xml metadata file in a local directory (without git installed)</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DSystPermName=&lt;name[,name]&gt; removeSystemPermission</echo>
+		<echo />
+
+		<echo>REMOVE HISTORY TRACKING (without git):</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DHistTrackObject=&lt;name[,name]&gt; removeHistTracking</echo>
+		<echo />
+
+		<echo>REMOVE A GIVEN CLASS ACCESSES (without git):</echo>
+		<echo>    Because sometimes you retrieve a lot of classes and when you deploy you may want to remove a class after a second thought...</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DClassApiName=&lt;ClassApiName&gt; removeClassAccesses</echo>
+		<echo />
+
+		<echo>REMOVE ANY CLASS ACCESSES (without git):</echo>
+		<echo>    Because sometimes you retrieve a lot of classes and when you deploy you may want to remove those classes after a second thought...</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; removeAnyClassAccesses</echo>
+		<echo />
+
+		<echo>REMOVE A GIVEN PAGE ACCESSES (without git):</echo>
+		<echo>    Because sometimes you retrieve a lot of pages and when you deploy you may want to remove a page after a second thought...</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DClassApiName=&lt;PageApiName&gt; removePageAccesses</echo>
+		<echo />
+
+		<echo>REMOVE ANY PAGE ACCESSES (without git):</echo>
+		<echo>    Because sometimes you retrieve a lot of pages and when you deploy you may want to remove those pages after a second thought...</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; removeAnyPageAccesses</echo>
+		<echo />
+
+		<echo>REMOVE FIELD PERMISSION (without git):</echo>
+		<echo>    Because sometimes you retrieve a lot of things and when you deploy you may want to clean some fields.</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DFieldApiName=&lt;name&gt; removeFieldPermission</echo>
+		<echo />
+
+		<echo>SUBSTITUTE VALUES (without git):</echo>
+		<echo>    Because some identifiers can contain special characters that will mess up deployment, this task is meant to change that.</echo>
+		<echo>    Usage: ant -f &lt;Salesforce_Deploy_Toolbox.xml&gt; -propertyfile &lt;build.properties&gt; -DDirectory=&lt;dir&gt; -DInitialValue=&lt;value&gt; -DSubstituedValue=&lt;value&gt; substitute</echo>
+		<echo />
+
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Make sure this ant script is ok XML speaking                                     -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> test                               -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="test" />
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Generate the package xml file with all components possible in an org             -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DPackageXmlFilename=<file>                      -->
+	<!--            -DApiVersion=<version> [-DStandardObjectsAndFields=<file>]            -->
+	<!--            [-DListDetails=true|false] generatePackageXml                         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="generatePackageXml">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="PackageXmlFilename" />
+		<check-argument-string-not-empty name="PackageXmlFilename" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<set-proxy />
+		<sf-generate-package-xml
+			organization="${Organization}"
+			filename="${PackageXmlFilename}"
+			apiversion="${ApiVersion}"
+			standardObjectsAndFields="${StandardObjectsAndFields}"
+			listdetails="${ListDetails}" />
+
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Split a package xml file into more than one package xml files by filtering the   -->
+	<!--       metadata types out of the first xml file and generate lonely xml files     -->
+	<!--       (one for each metadata types from the list). Naming convention for lonely  -->
+	<!--       xml files is <file>.<Type1>                                                -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DPackageXmlFilename=<file> -DPackageXmlFilename1=<file1>             -->
+	<!--            -DPackageXmlFilename2=<file2>                                         -->
+	<!--            -DMetadataFilterForFile1=<Type1[,Type2][,Type3][,Type4][,...]>        -->
+	<!--            -DApiVersion=<version> splitPackageXml                                -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="splitPackageXml">
+		<check-argument-is-set name="PackageXmlFilename" />
+		<check-argument-string-not-empty name="PackageXmlFilename" />
+		<check-argument-is-set name="PackageXmlFilename1" />
+		<check-argument-string-not-empty name="PackageXmlFilename1" />
+		<check-argument-is-set name="PackageXmlFilename2" />
+		<check-argument-string-not-empty name="PackageXmlFilename2" />
+		<check-argument-is-set name="MetadataFilterForFile1" />
+		<check-argument-string-not-empty name="MetadataFilterForFile1" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<packagexml-split-in-more-than-one-part
+			inputfilename="${PackageXmlFilename}"
+			apiversion="${ApiVersion}"
+			outputfilename1="${PackageXmlFilename1}"
+			selectmetadatatypes1="${MetadataFilterForFile1}"
+			outputfilename2="${PackageXmlFilename2}" />
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Retrieves the metadata in a local directory (without git installed)              -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DPackageXmlFilename=<file> -DDirectory=<dir>    -->
+	<!--            retrieve                                                              -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="retrieve">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="PackageXmlFilename" />
+		<check-argument-string-not-empty name="PackageXmlFilename" />
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<trycatch property="ex">
+			<try>
+				<set-proxy />
+				<sf-retrieve-unpackaged
+					organization="${Organization}"
+					packagexmlfile="${PackageXmlFilename}"
+					retrievetarget="${Directory}" />
+			</try>
+			<catch>
+				<fail>Error while retrieving!!! Cause is: ${ex}</fail>
+			</catch>
+		</trycatch>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Deploy the metadata in a local directory (without git installed) to an org       -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DDirectory=<dir> -DCheckOnly=<true|false>       -->
+	<!--            -DRunTests=<none|local|all> deploy                                    -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="deploy">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="CheckOnly" />
+		<check-argument-string-not-empty name="CheckOnly" />
+		<check-argument-is-set name="RunTests" />
+		<check-argument-string-not-empty name="RunTests" />
+		<trycatch property="ex">
+			<try>
+				<set-proxy />
+				<sf-deploy
+					organization="${Organization}"
+					deployroot="${Directory}"
+					checkonly="${CheckOnly}"
+					runtests="${RunTests}"
+					logtype="Detail" />
+			</try>
+			<catch>
+				<fail>Error while deploying!!! Cause is: ${ex} with ant.version=${ant.version}</fail>
+			</catch>
+		</trycatch>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Run all unit tests of a given org. Arg 'ApiVersion' should be at least 33.0      -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DApiVersion=<version> runAllUnitTests           -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="runAllUnitTests">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<temporary-dir
+			organization="${Organization}"
+			property="tmpdir" />
+		<packagexml-headers
+			filename="${tmpdir}/package.xml" />
+		<packagexml-footers
+			filename="${tmpdir}/package.xml"
+			apiversion="${ApiVersion}" />
+		<trycatch property="ex">
+			<try>
+				<set-proxy />
+				<sf-deploy
+					organization="${Organization}"
+					deployroot="${tmpdir}"
+					checkonly="true"
+					runtests="all"
+					logtype="Detail" />
+			</try>
+			<catch>
+				<fail>Error while running tests!!! Cause is: ${ex}</fail>
+			</catch>
+			<finally>
+				<delete dir="${tmpdir}" />
+			</finally>
+		</trycatch>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Run only local unit tests of a given org. Arg 'ApiVersion' should be at least 33 -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DApiVersion=<version> runLocalUnitTests         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="runLocalUnitTests">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<temporary-dir
+			organization="${Organization}"
+			property="tmpdir" />
+		<packagexml-headers
+			filename="${tmpdir}/package.xml" />
+		<packagexml-footers
+			filename="${tmpdir}/package.xml"
+			apiversion="${ApiVersion}" />
+		<trycatch property="ex">
+			<try>
+				<set-proxy />
+				<sf-deploy
+					organization="${Organization}"
+					deployroot="${tmpdir}"
+					checkonly="true"
+					runtests="local"
+					logtype="Detail" />
+			</try>
+			<catch>
+				<fail>Error while running tests!!! Cause is: ${ex}</fail>
+			</catch>
+			<finally>
+				<delete dir="${tmpdir}" />
+			</finally>
+		</trycatch>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Backup all metadata from an org in a local repository under git                  -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DGitLocalRepDir=<dir> -DApiVersion=<version>    -->
+	<!--            [-DMetadataFilterForFile1=Type[,Type]]                                -->
+	<!--            [-DPackageXmlStandardObjAndFld=<file>]                                -->
+	<!--            [-DStandardObjectsAndFields=<file>]                                   -->
+	<!--            [-DListDetails=true|false] backup                                     -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="backup">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="GitLocalRepDir" />
+		<check-argument-directory-exists name="GitLocalRepDir" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<git-check-if-branch-exists
+			organization="${Organization}"
+			dir="${GitLocalRepDir}" />
+		<temporary-file
+			property="packageXmlTempFilename"
+			deleteonexit="true"
+			organization="${Organization}"
+			label="PackageXml" />
+		<set-proxy />
+		<sf-generate-package-xml
+			organization="${Organization}"
+			filename="${packageXmlTempFilename}"
+			standardObjectsAndFields="${StandardObjectsAndFields}"
+			listdetails="${ListDetails}"
+			apiversion="${ApiVersion}" />
+
+		<if><not><equals arg1="${MetadataFilterForFile1}" arg2="" /></not><then>
+			<packagexml-split-in-more-than-one-part
+				inputfilename="${packageXmlTempFilename}"
+				apiversion="${ApiVersion}"
+				outputfilename1="${packageXmlTempFilename}.1"
+				selectmetadatatypes1="${MetadataFilterForFile1}"
+				outputfilename2="${packageXmlTempFilename}.2"
+				organization="${Organization}" />
+		</then></if>
+
+		<git-checkout
+			organization="${Organization}"
+			dir="${GitLocalRepDir}" />
+		<trycatch property="ex">
+			<try>
+				<git-current-clean
+					dir="${GitLocalRepDir}"/>
+				<set-proxy />
+				<if><equals arg1="${MetadataFilterForFile1}" arg2="" /><then>
+					<sf-retrieve-unpackaged
+						organization="${Organization}"
+						packagexmlfile="${packageXmlTempFilename}"
+						retrievetarget="${GitLocalRepDir}" />
+				</then>
+				<else>
+					<sf-retrieve-unpackaged
+						organization="${Organization}"
+						packagexmlfile="${packageXmlTempFilename}.1"
+						retrievetarget="${GitLocalRepDir}" />
+					<for param="lonelyXmlFile">
+						<fileset dir="${java.io.tmpdir}">
+							<include name="**/${packageXmlTempFilename}.2*" />
+						</fileset>
+						<sequential>
+							<sf-retrieve-unpackaged
+								organization="${Organization}"
+								packagexmlfile="@{lonelyXmlFile}"
+								retrievetarget="${GitLocalRepDir}" />
+							<delete file="@{lonelyXmlFile}" failonerror="true" />
+						</sequential>
+					</for>
+					<delete file="${packageXmlTempFilename}.1" failonerror="true" />
+					<copy file="${packageXmlTempFilename}" tofile="${GitLocalRepDir}/package.xml" />
+				</else></if>
+				<git-commit-all
+					organization="${Organization}"
+					dir="${GitLocalRepDir}" />
+			</try>
+			<catch>
+				<git-current-reset-hard
+					dir="${GitLocalRepDir}" />
+				<fail>Error while backuping!!! Cause is: ${ex}</fail>
+			</catch>
+		</trycatch>
+	</target>
+
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Backup all metadata from an org in a local directory (without git installed)     -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DOrganization=<org> -DDirectory=<dir> -DApiVersion=<version>         -->
+	<!--            [-DMetadataFilterForFile1=Type[,Type]]                                -->
+	<!--            [-DPackageXmlStandardObjAndFld=<file>]                                -->
+	<!--            [-DStandardObjectsAndFields=<file>]                                   -->
+	<!--            [-DListDetails=true|false] backup2                                    -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="backup2">
+		<check-argument-is-set name="Organization" />
+		<check-argument-string-not-empty name="Organization" />
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="ApiVersion" />
+		<check-argument-string-not-empty name="ApiVersion" />
+		<temporary-file
+			property="packageXmlTempFilename"
+			deleteonexit="true"
+			organization="${Organization}"
+			label="PackageXml" />
+		<set-proxy />
+		<sf-generate-package-xml
+			organization="${Organization}"
+			filename="${packageXmlTempFilename}"
+			apiversion="${ApiVersion}"
+			standardObjectsAndFields="${StandardObjectsAndFields}"
+			listdetails="${ListDetails}" />
+
+		<if><not><equals arg1="${MetadataFilterForFile1}" arg2="" /></not><then>
+			<packagexml-split-in-more-than-one-part
+				inputfilename="${packageXmlTempFilename}"
+				apiversion="${ApiVersion}"
+				outputfilename1="${packageXmlTempFilename}.1"
+				selectmetadatatypes1="${MetadataFilterForFile1}"
+				outputfilename2="${packageXmlTempFilename}.2"
+				organization="${Organization}" />
+		</then></if>
+
+		<trycatch property="ex">
+			<try>
+				<set-proxy />
+				<if><equals arg1="${MetadataFilterForFile1}" arg2="" /><then>
+					<sf-retrieve-unpackaged
+						organization="${Organization}"
+						packagexmlfile="${packageXmlTempFilename}"
+						retrievetarget="${Directory}" />
+				</then>
+				<else>
+					<sf-retrieve-unpackaged
+						organization="${Organization}"
+						packagexmlfile="${packageXmlTempFilename}.1"
+						retrievetarget="${Directory}" />
+					<for param="lonelyXmlFile">
+						<fileset dir="${java.io.tmpdir}">
+							<include name="**/${packageXmlTempFilename}.2*" />
+						</fileset>
+						<sequential>
+							<sf-retrieve-unpackaged
+								organization="${Organization}"
+								packagexmlfile="@{lonelyXmlFile}"
+								retrievetarget="${Directory}" />
+							<delete file="@{lonelyXmlFile}" failonerror="true" />
+						</sequential>
+					</for>
+					<delete file="${packageXmlTempFilename}.1" failonerror="true" />
+					<copy file="${packageXmlTempFilename}" tofile="${Directory}/package.xml" />
+				</else></if>
+			</try>
+			<catch>
+				<fail>Error while backuping!!! Cause is: ${ex}</fail>
+			</catch>
+		</trycatch>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because some new system permission will prevent you from deploying into an older -->
+	<!--       release, this target will comment those system permissions in Profiles and -->
+	<!--       Perm Sets xml metadata file in a local directory (without git installed)   -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> -DSystPermName=<Name[,Name]> removeSystemPermission -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeSystemPermission">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="SystPermName" />
+		<check-argument-string-not-empty name="SystPermName" />
+		<for list="${SystPermName}" delimiter="," param = "val">
+			<sequential>
+				<replaceregexp
+					flags="gm"
+					match="(&lt;userPermissions&gt;[^&lt;]*&lt;enabled&gt;[^&lt;]*&lt;/enabled&gt;[^&lt;]*&lt;name&gt;@{val}&lt;/name&gt;[^&lt;]*&lt;/userPermissions&gt;)"
+					replace="&lt;!-- \1 --&gt;">
+					<fileset dir="${Directory}">
+						<include name="profiles/*.profile" />
+						<include name="permissionsets/*.permissionset" />
+					</fileset>
+				</replaceregexp>
+			</sequential>
+		</for>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> -DHistTrackObject=<Name[,Name]> removeHistTracking  -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeHistTracking">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="HistTrackObject" />
+		<check-argument-string-not-empty name="HistTrackObject" />
+		<for list="${HistTrackObject}" delimiter="," param = "val">
+			<sequential>
+				<for list="trackHistory,trackFeedHistory" delimiter="," param = "tag">
+					<sequential>
+						<replaceregexp
+							flags="gm"
+							match="&lt;@{tag}&gt;true&lt;/@{tag}&gt;"
+							replace="&lt;@{tag}&gt;false&lt;/@{tag}&gt;">
+							<fileset dir="${Directory}">
+								<include name="objects/@{val}.object" />
+							</fileset>
+						</replaceregexp>
+					</sequential>
+				</for>
+			</sequential>
+		</for>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because sometimes you retrieve a lot of things and when you deploy you may want  -->
+	<!--       to clean some fields. Those fields are also refered in the profiles and    -->
+	<!--       perm set for FLS. This target will comment the FLS of a particular field   -->
+	<!--       in Profiles and Perm Sets xml metadata file in a local directory (without  -->
+	<!--       git installed)                                                             -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> -DFieldApiName=<Name> removeFieldPermission         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeFieldPermission">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="FieldApiName" />
+		<check-argument-string-not-empty name="FieldApiName" />
+		<replaceregexp
+			flags="m"
+			match="(&lt;fieldPermissions&gt;[^&lt;]*&lt;editable&gt;[^&lt;]*&lt;/editable&gt;[^&lt;]*&lt;field&gt;${FieldApiName}&lt;/field&gt;[^&lt;]*&lt;readable&gt;[^&lt;]*&lt;/readable&gt;[^&lt;]*&lt;/fieldPermissions&gt;)"
+			replace="&lt;!-- \1 --&gt;">
+			<fileset dir="${Directory}">
+				<include name="profiles/*.profile" />
+				<include name="permissionsets/*.permissionset" />
+			</fileset>
+		</replaceregexp>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because sometimes you retrieve a lot of classes and when you deploy you may want -->
+	<!--       to remove those classes after a second thought.... Those classes are also  -->
+	<!--       refered in the profiles and perm set. This target will comment the access  -->
+	<!--       of any class in Profiles and Perm Sets xml metadata file in a local dir    -->
+	<!--       (without git installed)                                                    -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> removeAnyClassAccesses                              -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeAnyClassAccesses">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<replaceregexp
+			flags="gm"
+			match="(&lt;classAccesses&gt;[^&lt;]*&lt;apexClass&gt;[^&lt;]*&lt;/apexClass&gt;[^&lt;]*&lt;enabled&gt;[^&lt;]*&lt;/enabled&gt;[^&lt;]*&lt;/classAccesses&gt;)"
+			replace="&lt;!-- \1 --&gt;">
+			<fileset dir="${Directory}">
+				<include name="profiles/*.profile" />
+				<include name="permissionsets/*.permissionset" />
+			</fileset>
+		</replaceregexp>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because sometimes you retrieve a lot of classes and when you deploy you may want -->
+	<!--       to remove those classes after a second thought.... Those classes are also  -->
+	<!--       refered in the profiles and perm set. This target will comment the access  -->
+	<!--       of given class in Profiles and Perm Sets xml metadata file in a local dir  -->
+	<!--       (without git installed)                                                    -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> -DClassApiName=<Name> removeClassAccesses           -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeClassAccesses">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="ClassApiName" />
+		<check-argument-string-not-empty name="ClassApiName" />
+		<replaceregexp
+			flags="m"
+			match="(&lt;classAccesses&gt;[^&lt;]*&lt;apexClass&gt;[^&lt;]${ClassApiName}&lt;/apexClass&gt;[^&lt;]*&lt;enabled&gt;[^&lt;]*&lt;/enabled&gt;[^&lt;]*&lt;/classAccesses&gt;)"
+			replace="&lt;!-- \1 --&gt;">
+			<fileset dir="${Directory}">
+				<include name="profiles/*.profile" />
+				<include name="permissionsets/*.permissionset" />
+			</fileset>
+		</replaceregexp>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because sometimes you retrieve a lot of pages and when you deploy you may want   -->
+	<!--       to remove those pages after a second thought.... Those pages are also      -->
+	<!--       refered in the profiles and perm set. This target will comment the access  -->
+	<!--       of any pages in Profiles and Perm Sets xml metadata file in a local dir    -->
+	<!--       (without git installed)                                                    -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> removeAnyPageAccesses                               -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removeAnyPageAccesses">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<replaceregexp
+			flags="gm"
+			match="(&lt;pageAccesses&gt;[^&lt;]*&lt;apexPage&gt;[^&lt;]*&lt;/apexPage&gt;[^&lt;]*&lt;enabled&gt;[^&lt;]*&lt;/enabled&gt;[^&lt;]*&lt;/pageAccesses&gt;)"
+			replace="&lt;!-- \1 --&gt;">
+			<fileset dir="${Directory}">
+				<include name="profiles/*.profile" />
+				<include name="permissionsets/*.permissionset" />
+			</fileset>
+		</replaceregexp>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because sometimes you retrieve a lot of pages and when you deploy you may want   -->
+	<!--       to remove those pages after a second thought.... Those pages are also      -->
+	<!--       refered in the profiles and perm set. This target will comment the access  -->
+	<!--       of given page in Profiles and Perm Sets xml metadata file in a local dir   -->
+	<!--       (without git installed)                                                    -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> removeAnyPageAccesses                               -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="removePageAccesses">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="PageApiName" />
+		<check-argument-string-not-empty name="PageApiName" />
+		<replaceregexp
+			flags="gm"
+			match="(&lt;pageAccesses&gt;[^&lt;]*&lt;apexPage&gt;[^&lt;]${PageApiName}&lt;/apexPage&gt;[^&lt;]*&lt;enabled&gt;[^&lt;]*&lt;/enabled&gt;[^&lt;]*&lt;/pageAccesses&gt;)"
+			replace="&lt;!-- \1 --&gt;">
+			<fileset dir="${Directory}">
+				<include name="profiles/*.profile" />
+				<include name="permissionsets/*.permissionset" />
+			</fileset>
+		</replaceregexp>
+	</target>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Because some identifiers can contain special characters that will mess up        -->
+	<!--          deployment, this task is meant to change that..                         -->
+	<!--                                                                                  -->
+	<!-- Usage: ant -f <Salesforce_Deploy_Toolbox.xml> -propertyfile <build.properties>   -->
+	<!--            -DDirectory=<dir> -DInitialValue=<value> -DSubstituedValue=<value>    -->
+	<!--            substitute                                                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<target name="substitute">
+		<check-argument-is-set name="Directory" />
+		<check-argument-directory-exists name="Directory" />
+		<check-argument-is-set name="InitialValue" />
+		<check-argument-is-set name="SubstituedValue" />
+		<replace dir="${Directory}" token="@{InitialValue}" value="@{SubstituedValue}"><include name="**/*"/></replace>
+	</target>
+
+	<!-- ================================================================================ -->
+	<!--                                                                                  -->
+	<!-- Macros                                                                           -->
+	<!--                                                                                  -->
+	<!-- ================================================================================ -->
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <check-argument-is-set name="nnn" />                                      -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="check-argument-is-set">
+		<attribute name="name" />
+		<sequential>
+			<if>
+				<not><isset property="@{name}" /></not>
+				<then>
+					<fail>Argument '@{name}' was not set in the command line! Please check the correct usage from help target.</fail>
+				</then>
+			</if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <check-argument-string-not-empty name="nnn" />                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="check-argument-string-not-empty">
+		<attribute name="name" />
+		<sequential>
+			<if>
+				<equals arg1="${@{name}}" arg2="" />
+				<then>
+					<fail>Argument '@{name}' was set as an empty string in the command line! Please check the correct usage from help target.</fail>
+				</then>
+			</if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <check-argument-directory-exists name="nnn" value="vvv" />                -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="check-argument-directory-exists">
+		<attribute name="name" />
+		<attribute name="value" default="" />
+		<sequential>
+			<if>
+				<not><available file="${@{name}}" type="dir"/></not>
+				<then>
+					<fail>Argument '@{name}' with value='${@{name}}' is not an existing directory! Please check the correct usage from help target.</fail>
+				</then>
+			</if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <set-proxy />                                                             -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="set-proxy">
+		<sequential>
+			<if>
+				<equals arg1="${proxy.use}" arg2="true" />
+				<then>
+					<setproxy proxyhost="${proxy.host}" proxyport="${proxy.port}" proxyuser="${proxy.user}" proxypassword="${proxy.password}" />
+				</then>
+			</if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <temporary-dir organization="org" property="tmpdir" />                    -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="temporary-dir">
+		<attribute name="organization" />
+		<attribute name="property" />
+		<sequential>
+			<tstamp>
+				<format property="today" pattern="yyyyMMddHHmmssSSS" />
+   				</tstamp>
+			<var name="@{property}" value="${java.io.tmpdir}/sf-@{organization}-${today}" />
+			<mkdir dir="${@{property}}" />
+			<echo level="debug">Temporary directory is '${@{property}}'</echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <temporary-file organization="org" property="tmpfile" label="label"       -->
+	<!--               deleteonexit="true|false" />                                       -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="temporary-file">
+		<attribute name="organization" />
+		<attribute name="property" />
+		<attribute name="label" />
+		<attribute name="deleteonexit" default="true" />
+		<sequential>
+			<var name="@{property}" unset="true" />
+			<tempfile property="@{property}" destDir="${java.io.tmpdir}" createfile="true" deleteonexit="@{deleteonexit}" prefix="sf-@{organization}-@{label}-" suffix=".txt" />
+			<echo level="debug">Temporary file is '${@{property}}'</echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-headers filename="file" />                                    -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-headers">
+		<attribute name="filename" />
+		<sequential>
+			<echo file="@{filename}" encoding="UTF-8" append="false"><![CDATA[<?xml version="1.0" encoding="UTF-8"?>${line.separator}]]></echo>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[<Package xmlns="http://soap.sforce.com/2006/04/metadata">${line.separator}]]></echo>
+		</sequential>
+	</macrodef>
+          
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-open-types-tag filename="file" metadatatype="type" />         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-open-types-tag">
+		<attribute name="filename" />
+		<attribute name="metadatatype" />
+		<sequential>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[ 	<types>${line.separator}]]></echo>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[		<name>@{metadatatype}</name>${line.separator}]]></echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-add-members-tag filename="file" metadata="md" />              -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-add-members-tag">
+		<attribute name="filename" />
+		<attribute name="metadata" />
+		<sequential>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[		<members>@{metadata}</members>${line.separator}]]></echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-close-types-tag filename="file" />                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-close-types-tag">
+		<attribute name="filename" />
+		<sequential>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[ 	</types>${line.separator}]]></echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-footers filename="file" apiversion="40.0" />                  -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-footers">
+		<attribute name="filename" />
+		<attribute name="apiversion" />
+		<sequential>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[    <version>@{apiversion}</version>${line.separator}]]></echo>
+			<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[</Package>]]></echo>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-add-members-tags-from-file filename="file"                    -->
+	<!--                  tmpfile="txtfile" />                                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-add-members-tags-from-file">
+		<attribute name="filename" />
+		<attribute name="tmpfile" />
+		<sequential>
+			<if><available file="@{tmpfile}" /><then>
+
+				<loadfile property="rawcomments" srcfile="@{tmpfile}" failonerror="false" />
+				<echo file="@{filename}" encoding="UTF-8" append="true"><![CDATA[<!-- Metadata information details: ${line.separator}${rawcomments}${line.separator}-->]]></echo>
+
+				<var name="sections" unset="true" />
+				<copy file="@{tmpfile}" tofile="@{tmpfile}.sorted">
+					<filterchain>
+						<tokenfilter>
+							<containsregex
+								pattern="FullName/Id: (.*)/[0-9A-Za-z]*"
+								replace="\1" />
+						</tokenfilter>
+						<sortfilter />
+						<uniqfilter />
+					</filterchain>
+				</copy>
+				<loadfile property="sections" srcfile="@{tmpfile}.sorted" failonerror="false" />
+				<if><isset property="sections"/><then>
+					<for param="metadata" list="${sections}" delimiter="${line.separator}">
+						<sequential>
+							<packagexml-add-members-tag filename="@{filename}" metadata="@{metadata}" />
+						</sequential>
+					</for>
+				</then></if>
+				<delete file="@{tmpfile}.sorted" failonerror="false" />
+			</then></if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-add-types-tags filename="file" metadatatype="type" />         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-add-types-tags">
+		<attribute name="filename" />
+		<attribute name="metadatatype" />
+		<sequential>
+			<packagexml-open-types-tag filename="@{filename}" metadatatype="@{metadatatype}" />
+			<packagexml-add-members-tag filename="@{filename}" metadata="*" />
+			<packagexml-close-types-tag filename="@{filename}" />
+		</sequential>
+	</macrodef>
+
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-add-types-tags-from-file filename="file"                      -->
+	<!--                  metadatatype="type" tmpfile="txtfile" />                        -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-add-types-tags-from-file">
+		<attribute name="filename" />
+		<attribute name="metadatatype" />
+		<attribute name="tmpfile" />
+		<sequential>
+			<packagexml-open-types-tag filename="@{filename}" metadatatype="@{metadatatype}" />
+			<packagexml-add-members-tag filename="@{filename}" metadata="*" />
+			<packagexml-add-members-tags-from-file filename="@{filename}" tmpfile="@{tmpfile}" />
+			<packagexml-close-types-tag filename="@{filename}" />
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <packagexml-split-in-more-than-one-part inputfilename="file"              -->
+	<!--                 apiversion="40.0"                                                -->
+	<!--                 outputfilename1="file.1"                                         -->
+	<!--                 selectmetadatatypes1="Dashboard,Report,EmailTemplate,Role"       -->
+	<!--                 outputfilename2="file.2" organization="org"                      -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="packagexml-split-in-more-than-one-part">
+		<attribute name="inputfilename" />
+		<attribute name="apiversion" />
+		<attribute name="outputfilename1" />
+		<attribute name="selectmetadatatypes1" />
+		<attribute name="outputfilename2" />
+		<attribute name="organization" />
+		<sequential>
+			<if><available file="@{inputfilename}" /><then>
+				<packagexml-headers
+					filename="@{outputfilename1}" />
+				<var name="contentfile" unset="true" />
+				<var name="currentName" value="" />
+				<var name="currentMember" value="" />
+				<temporary-file
+					property="lonelyMembersList"
+					deleteonexit="true"
+					organization="@{organization}"
+					label="Members" />
+				<loadfile property="contentfile" srcfile="@{inputfilename}" failonerror="true" />
+				<for param="contentline" list="${contentfile}" delimiter="${line.separator}">
+					<sequential>
+						<!--                                           -->
+						<!-- IF THE LINE CONTAINS THE METADATA TYPE    -->
+						<!--                                           -->
+						<if><contains string="@{contentline}" substring="&lt;name&gt;" /><then>
+							<propertyregex property="currentName" input="@{contentline}" override="true" regexp="&lt;name&gt;([^&lt;]*)&lt;/name&gt;" select="\1" />
+						</then><else>
+						<!--                                           -->
+						<!-- IF THE LINE CONTAINS THE METADATA MEMBER  -->
+						<!--                                           -->
+						<if><contains string="@{contentline}" substring="&lt;members&gt;" /><then>
+							<propertyregex property="currentMember" input="@{contentline}" override="true" regexp="&lt;members&gt;([^&lt;]*)&lt;/members&gt;" select="\1" />
+							<packagexml-add-members-tag
+								filename="${lonelyMembersList}"
+								metadata="${currentMember}" />
+						</then><else>
+						<!--                                           -->
+						<!-- IF THE LINE CLOSE THE METADATA TYPE       -->
+						<!--                                           -->
+						<if><contains string="@{contentline}" substring="&lt;/types&gt;" /><then>
+							<if><available file="${lonelyMembersList}" /><then>
+								<if><contains string=",@{selectmetadatatypes1}," substring=",${currentName}," /><then>
+									<packagexml-headers
+										filename="@{outputfilename2}.${currentName}" />
+									<packagexml-open-types-tag
+										filename="@{outputfilename2}.${currentName}"
+										metadatatype="${currentName}" />
+									<concat append="yes" destfile="@{outputfilename2}.${currentName}">
+										<fileset file="${lonelyMembersList}" />
+									</concat>
+									<packagexml-close-types-tag
+										filename="@{outputfilename2}.${currentName}" />
+									<packagexml-footers
+										filename="@{outputfilename2}.${currentName}"
+										apiversion="@{apiversion}" />
+								</then><else>
+									<packagexml-open-types-tag
+										filename="@{outputfilename1}"
+										metadatatype="${currentName}" />
+									<concat append="yes" destfile="@{outputfilename1}">
+										<fileset file="${lonelyMembersList}" />
+									</concat>
+									<packagexml-close-types-tag
+										filename="@{outputfilename1}" />
+								</else></if>
+								<echo file="${lonelyMembersList}" message="" />
+							</then></if>
+							<var name="currentName" value="" />
+							<var name="currentMember" value="" />
+						</then></if>
+						</else></if>
+						</else></if>
+					</sequential>
+				</for>
+				<packagexml-footers
+					filename="@{outputfilename1}"
+					apiversion="@{apiversion}" />
+			</then></if>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-commit-all organization="org" dir="directory" />                     -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-commit-all">
+		<attribute name="organization" />
+		<attribute name="dir" />
+		<sequential>
+			<tstamp>
+				<format property="today" pattern="yyyy/MM/dd HH:mm:SS" />
+   				</tstamp>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="add" />
+				<arg value="--all" />
+			</exec>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="commit" />
+				<arg value="-am" />
+				<arg value="Organization @{organization} on ${today}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-checkout organization="org" dir="directory" />                       -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-checkout">
+		<attribute name="organization" />
+		<attribute name="dir" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="checkout" />
+				<arg value="@{organization}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-current-clean dir="directory" />                                     -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-current-clean">
+		<attribute name="dir" />
+		<sequential>
+			<delete>
+				<fileset dir="@{dir}" excludes=".donotdelete" />
+				<dirset dir="@{dir}" />
+			</delete>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-current-reset-hard dir="directory" />                                -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-current-reset-hard">
+		<attribute name="dir" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="reset" />
+				<arg value="--hard" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-current-reset-merge dir="directory" />                               -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-current-reset-merge">
+		<attribute name="dir" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="reset" />
+				<arg value="--merge" />
+				<arg value="ORIG_HEAD" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-merge organization="org" dir="directory" />                          -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-merge">
+		<attribute name="organization" />
+		<attribute name="dir" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="merge" />
+				<arg value="-s" />
+				<arg value="recursive" />
+				<arg value="-X" />
+				<arg value="ours" />
+				<arg value="@{organization}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-recreate-branch organization="org"                                   -->
+	<!--                    fromorganization="fromorg" dir="directory" />                 -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-recreate-branch">
+		<attribute name="organization" />
+		<attribute name="fromorganization" />
+		<attribute name="dir" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="branch" />
+				<arg value="-D" />
+				<arg value="@{organization}" />
+			</exec>
+			<git-checkout organization="@{fromorganization}" dir="@{dir}" />
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="branch" />
+				<arg value="@{organization}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-check-if-branch-exists organization="org" dir="directory" />         -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-check-if-branch-exists">
+		<attribute name="organization" />
+		<attribute name="dir" />
+		<sequential>
+			<trycatch>
+				<try>
+					<git-checkout organization="@{organization}" dir="@{dir}" />
+				</try>
+				<catch>
+					<fail>The branch called '@{organization}' is not created in GIT. Ask the administrator to add it.</fail>
+				</catch>
+			</trycatch>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <git-diff organization1="org1" organization2="org2"                       -->
+	<!--                    dir="directory" />                                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="git-diff">
+		<attribute name="organization1" />
+		<attribute name="organization2" />
+		<attribute name="dir" />
+		<attribute name="resultproperty" />
+		<sequential>
+			<exec executable="${git.home.dir}/bin/git" dir="@{dir}" failifexecutionfails="true" failonerror="true">
+				<arg value="diff" />
+				<arg value="@{organization1}" />
+				<arg value="@{organization2}" />
+			</exec>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-describe-metadata organization="org" resultfile="txtfile"             -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-describe-metadata">
+		<attribute name="organization" />
+		<attribute name="resultfile" />
+		<sequential>
+			<echo level="debug">Call sf:describeMetadata with:</echo>
+			<echo level="debug"> - username="${sf.@{organization}.username}"</echo>
+			<echo level="debug"> - serverurl="${sf.@{organization}.serverurl}"</echo>
+			<echo level="debug"> - resultfilePath="@{resultfile}"</echo>
+			<describeMetadata
+				username="${sf.@{organization}.username}"
+				password="${sf.@{organization}.password}"
+				serverurl="${sf.@{organization}.serverurl}"
+				resultfilePath="@{resultfile}"
+			/>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-list-metadata organization="org" metadatatype="type"                  -->
+	<!--                   resultfile="txtfile"                                           -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-list-metadata">
+		<attribute name="organization" />
+		<attribute name="metadatatype" />
+		<attribute name="resultfile" />
+		<sequential>
+			<echo level="debug">Call sf:listMetadata with:</echo>
+			<echo level="debug"> - username="${sf.@{organization}.username}"</echo>
+			<echo level="debug"> - serverurl="${sf.@{organization}.serverurl}"</echo>
+			<echo level="debug"> - metadatatype="@{metadatatype}"</echo>
+			<echo level="debug"> - resultfilePath="@{resultfile}"</echo>
+			<listMetadata
+				username="${sf.@{organization}.username}"
+				password="${sf.@{organization}.password}"
+				serverurl="${sf.@{organization}.serverurl}"
+				metadatatype="@{metadatatype}"
+				resultfilePath="@{resultfile}"
+			/>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-list-metadata-infolder organization="org" metadatatype="type"         -->
+	<!--                   folder="foldername" resultfile="txtfile"                       -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-list-metadata-infolder">
+		<attribute name="organization" />
+		<attribute name="metadatatype" />
+		<attribute name="folder" />
+		<attribute name="resultfile" />
+		<sequential>
+			<echo level="debug">Call sf:listMetadata with:</echo>
+			<echo level="debug"> - username="${sf.@{organization}.username}"</echo>
+			<echo level="debug"> - serverurl="${sf.@{organization}.serverurl}"</echo>
+			<echo level="debug"> - metadatatype="@{metadatatype}"</echo>
+			<echo level="debug"> - folder="@{folder}"</echo>
+			<echo level="debug"> - resultfilePath="@{resultfile}"</echo>
+			<listMetadata
+				username="${sf.@{organization}.username}"
+				password="${sf.@{organization}.password}"
+				serverurl="${sf.@{organization}.serverurl}"
+				metadatatype="@{metadatatype}"
+				folder="@{folder}"
+				resultfilePath="@{resultfile}"
+			/>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-retrieve-unpackaged organization="org" packagexmlfile="file"          -->
+	<!--                   retrievetarget="dir"                                           -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-retrieve-unpackaged">
+		<attribute name="organization" />
+		<attribute name="packagexmlfile" />
+		<attribute name="retrievetarget" />
+		<sequential>
+			<echo>Metadata types in file=@{packagexmlfile}:</echo>
+			<concat>
+				<fileset file="@{packagexmlfile}" />
+				<filterchain>
+					<linecontains>
+						<contains value="name"/>
+					</linecontains>
+				</filterchain>
+			</concat>
+			<echo level="debug">Call sf:retrieve with:</echo>
+			<echo level="debug"> - username="${sf.@{organization}.username}"</echo>
+			<echo level="debug"> - serverurl="${sf.@{organization}.serverurl}"</echo>
+			<echo level="debug"> - unpackaged="@{packagexmlfile}"</echo>
+			<echo level="debug"> - retrievetarget="@{retrievetarget}"</echo>
+			<retrieve
+				username="${sf.@{organization}.username}"
+				password="${sf.@{organization}.password}"
+				serverurl="${sf.@{organization}.serverurl}"
+				unpackaged="@{packagexmlfile}"
+				retrievetarget="@{retrievetarget}"
+			/>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-deploy organization="org" deployroot="dir"                            -->
+	<!--                    checkonly="true|false" runtests="none|local|all"              -->
+	<!--                    logtype="level" />                                            -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-deploy">
+		<attribute name="organization" />
+		<attribute name="deployroot" />
+		<attribute name="checkonly" />
+		<attribute name="runtests" />
+		<attribute name="logtype" />
+		<sequential>
+			<var name="testLevel" unset="true" />
+			<if><equals arg1="@{runtests}" arg2="none" /><then>
+				<var name="testLevel" value="NoTestRun" />                                        
+			</then><elseif><equals arg1="@{runtests}" arg2="local" /><then>
+				<var name="testLevel" value="RunLocalTests" />                                               
+			</then></elseif><else><!-- runtests = 'all' -->
+				<var name="testLevel" value="RunAllTestsInOrg" />
+			</else></if>
+			<echo level="debug">Call sf:deploy with:</echo>
+			<echo level="debug"> - username="${sf.@{organization}.username}"</echo>
+			<echo level="debug"> - serverurl="${sf.@{organization}.serverurl}"</echo>
+			<echo level="debug"> - deployroot="@{deployroot}"</echo>
+			<echo level="debug"> - checkOnly="@{checkonly}"</echo>
+			<echo level="debug"> - testLevel="${testLevel}"</echo>
+			<echo level="debug"> - logType="@{logtype}"</echo>
+			<deploy
+				username="${sf.@{organization}.username}"
+				password="${sf.@{organization}.password}"
+				serverurl="${sf.@{organization}.serverurl}"
+				deployroot="@{deployroot}"
+				checkOnly="@{checkonly}"
+				testLevel="${testLevel}"
+				logType="@{logtype}"
+			/>
+		</sequential>
+	</macrodef>
+
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<!--                                                                                  -->
+	<!-- Usage: <sf-generate-package-xml organization="org" filename="file"               -->
+	<!--                                 apiversion="40.0"                                -->
+	<!--                                 standardObjectsAndFields=""                      -->
+	<!--                                 listdetails="false" />                           -->
+	<!--                                                                                  -->
+	<!-- .-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- -->
+	<macrodef name="sf-generate-package-xml">
+		<attribute name="organization" />
+		<attribute name="filename" />
+		<attribute name="apiversion" />
+		<attribute name="standardObjectsAndFields" default="" />
+		<attribute name="listdetails" default="false" />
+		<sequential>
+			<packagexml-headers
+				filename="@{filename}" />
+			<if><available file="@{standardObjectsAndFields}" /><then>
+				<concat destfile="@{filename}" append="true">
+					<fileset file="@{standardObjectsAndFields}"/>
+				</concat>
+			</then></if>
+			<temporary-file
+				property="describeTempFilename"
+				organization="@{organization}"
+				label="Describe" />
+			<sf-describe-metadata
+				organization="@{organization}"
+				resultfile="${describeTempFilename}" />
+			<var name="describeTempFile" unset="true" />
+			<loadfile property="describeTempFile" srcfile="${describeTempFilename}" failonerror="true" />
+			<for param="describeSection" list="${describeTempFile}" delimiter="*">
+				<sequential>
+					<if><contains string="@{describeSection}" substring=":" /><then>
+						<!-- Each section contains three important information we need: XMLName, InFolder and ChildObjects -->
+						<!--   * "XMLName" is the fullname of the metadata type that we use with sf:listMetatdata for its  -->
+						<!--               parameter "metadatatype"                                                        -->
+						<!--   * "InFolder" tells us how to list the metadata.                                             -->
+						<!--          If set to "false", we can list it directly.                                          -->
+						<!--          If set to "true", we need to list the folder and then for each folder we list the    -->
+						<!--             metadata                                                                          -->
+						<!--   * "ChildObjects" is the related metadata types to the main metadata described by "XMLName"  -->
+						<!--          We will also list the metadata types that are part of that list                      -->
+						<propertyregex property="metadatatype" input="@{describeSection}" override="true" regexp="XMLName: (.*)" select="\1" />
+						<propertyregex property="infolder" input="@{describeSection}" override="true" regexp="InFolder: (.*)" select="\1" />
+						<propertyregex property="childobjects" input="@{describeSection}" override="true" regexp="ChildObjects: (.*)" select="\1" />
+
+						<if><equals arg1="${infolder}" arg2="false" /><then>
+							<if><equals arg1="@{listdetails}" arg2="true" /><then>
+								<!-- The sf:listMetadata call is surounded by a try/catch because even if a metadata type  -->
+								<!-- was listed by sf:describeMetadata, it may be not present in the org so a call to      -->
+								<!-- sf:listMetadata with such a metadata type fails. In that case, we do not want the     -->
+								<!-- entire build to fail. We just catch the error and echo a line that says "Metadata     -->
+								<!-- type XXX ignored"                                                                     -->
+								<trycatch>
+									<try>
+										<echo level="info">List metadata of '${metadatatype}' from org=@{organization}...</echo>
+										<temporary-file
+											property="listTempFilename"
+											organization="@{organization}"
+											label="List-${metadatatype}" />
+										<sf-list-metadata
+											organization="@{organization}"
+											metadatatype="${metadatatype}"
+											resultfile="${listTempFilename}" />
+										<packagexml-add-types-tags-from-file
+											filename="@{filename}"
+											metadatatype="${metadatatype}"
+											tmpfile="${listTempFilename}" />
+										<delete file="${listTempFilename}" />
+									</try>
+									<catch>
+										<echo level="warning">Metadata type '${metadatatype}' ignored.</echo>
+									</catch>
+								</trycatch>
+								<!-- List all the child (the value taken in the file generated by sf:describeMetadata is a -->
+								<!-- list with ',' as the delimiter                                                        -->
+								<for param="childobject" list="${childobjects}" delimiter=",">
+									<sequential>
+										<trycatch>
+											<try>
+												<echo level="info">List metadata of '${metadatatype} child' called '@{childobject}' from org=@{organization}...</echo>
+												<temporary-file
+													property="listTempFilename"
+													organization="@{organization}"
+													label="List-@{childobject}" />
+												<sf-list-metadata
+													organization="@{organization}"
+													metadatatype="@{childobject}"
+													resultfile="${listTempFilename}" />
+												<packagexml-add-types-tags-from-file
+													filename="@{filename}"
+													metadatatype="@{childobject}"
+													tmpfile="${listTempFilename}" />
+												<delete file="${listTempFilename}" />
+											</try>
+											<catch>
+												<echo level="warning">Metadata type '@{childobject}' ignored.</echo>
+											</catch>
+										</trycatch>
+									</sequential>
+								</for>
+							</then><else>
+								<!-- In this case we do not care about details, we just add a wildcard -->
+								<packagexml-add-types-tags
+									filename="@{filename}"
+									metadatatype="${metadatatype}" />
+								<for param="childobject" list="${childobjects}" delimiter=",">
+									<sequential>
+										<packagexml-add-types-tags
+											filename="@{filename}"
+											metadatatype="@{childobject}" />
+									</sequential>
+								</for>
+							</else></if>
+
+						</then>
+						<else>
+							<!-- The folder type name can be guessed for the metadatatype itself. In version   -->
+							<!-- 30.0 and 31.0 of the SOAP API, we have the following correspondance:          -->
+							<!--   "Dashboard" stored in "DashboardFolder"                                     -->
+							<!--   "Report" stored in "ReportFolder"                                           -->
+							<!--   "Document" stored in "DocumentFolder"                                       -->
+							<!--   "EmailTemplate" stored in "EmailFolder"                                     -->
+							<!-- So basically if the current metadata type is EmailTemplate then the Folder    -->
+							<!-- Type will be Email Template, if not then the Folder Type is XXXXFolder.       -->
+							<if><equals arg1="${metadatatype}" arg2="EmailTemplate" /><then>
+								<var name="foldermetadatatype" value="EmailFolder" />
+							</then>
+							<else>
+								<var name="foldermetadatatype" value="${metadatatype}Folder" />
+							</else></if>
+							<if><equals arg1="@{listdetails}" arg2="false" /><then>
+								<packagexml-add-types-tags
+									filename="@{filename}"
+									metadatatype="${foldermetadatatype}" />
+								<packagexml-add-types-tags
+									filename="@{filename}"
+									metadatatype="${metadatatype}" />
+							</then><else>
+								<!-- In this case we need to call sf:listMetadata over the folder type of the current      -->
+								<!-- metadata type. By doing this, we will have a list of folders that can contains the    -->
+								<!-- current metadata type we are interseted in. We will iterate throught this list, and   -->
+								<!-- for each folder we will call sf:listMetadata for the current metadata type AND the    -->
+								<!-- folder!!                                                                              -->
+								<trycatch>
+									<try>
+										<echo level="info">List metadata of '${foldermetadatatype}' from org=@{organization}...</echo>
+										<temporary-file
+											property="listTempFilename"
+											organization="@{organization}"
+											label="List-${foldermetadatatype}" />
+										<sf-list-metadata
+											organization="@{organization}"
+											metadatatype="${foldermetadatatype}"
+											resultfile="${listTempFilename}" />
+										<packagexml-add-types-tags-from-file
+											filename="@{filename}"
+											metadatatype="${metadatatype}"
+											tmpfile="${listTempFilename}" />
+									</try>
+									<catch>
+										<echo level="warning">Metadata type '${foldermetadatatype}' ignored.</echo>
+									</catch>
+								</trycatch>
+								<if><available file="${listTempFilename}" /><then>
+									<packagexml-open-types-tag
+										filename="@{filename}"
+										metadatatype="${metadatatype}" />
+									<var name="listTempFile" unset="true" />
+									<copy file="${listTempFilename}" tofile="${listTempFilename}.sorted">
+										<filterchain>
+											<tokenfilter>
+	 											<containsregex
+													pattern="FullName/Id: (.*)/[0-9A-Za-z]*"
+													replace="\1" />
+											</tokenfilter>
+											<sortfilter />
+											<uniqfilter />
+										</filterchain>
+									</copy>
+									<delete file="${listTempFilename}" />
+									<loadfile property="listTempFile" srcfile="${listTempFilename}.sorted" failonerror="true" />
+									<for param="foldername" list="${listTempFile}" delimiter="${line.separator}">
+										<sequential>
+											<trycatch>
+			 									<try>
+				 									<echo level="info">List metadata of '${metadatatype}' in folder '@{foldername}' from org=@{organization}...</echo>
+				 									<temporary-file
+														property="listTempFilename2"
+														organization="@{organization}"
+														label="List-${metadatatype}-in-@{foldername}"  />
+		 											<sf-list-metadata-infolder
+														organization="@{organization}"
+														metadatatype="${metadatatype}"
+														resultfile="${listTempFilename2}"
+														folder="@{foldername}" />
+		 											<packagexml-add-members-tags-from-file
+														filename="@{filename}"
+														tmpfile="${listTempFilename2}" />
+		 											<delete file="${listTempFilename2}" />
+			 									</try>
+			 									<catch>
+		 											<echo level="warning">Metadata type '${metadatatype}' ignored in the folder '@{foldername}'.</echo>
+			 									</catch>
+											</trycatch>
+										</sequential>
+									</for>
+									<packagexml-close-types-tag
+										filename="@{filename}" />
+									<delete file="${listTempFilename}.sorted" />
+								</then></if>
+							</else></if>
+						</else></if>
+					</then></if>
+				</sequential>
+			</for>
+			<packagexml-footers
+				filename="@{filename}"
+				apiversion="@{apiversion}" />
+		</sequential>
+	</macrodef>
+</project>
